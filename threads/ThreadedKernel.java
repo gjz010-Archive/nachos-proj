@@ -107,6 +107,8 @@ public class ThreadedKernel extends Kernel {
 			new KThread(waiter[i]).fork();
 		}
 		a.waitUntil(2000*100);
+		
+		Boat.selfTest();
 		/*
 		Communicator c=new Communicator();
 		Semaphore cntr=new Semaphore(0);

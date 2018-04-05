@@ -126,7 +126,6 @@ public class PriorityScheduler extends Scheduler {
      * A <tt>ThreadQueue</tt> that sorts threads by priority.
      */
     protected class PriorityQueue extends ThreadQueue {
-		java.util.PriorityQueue<ThreadState> states;
 	PriorityQueue(boolean transferPriority) {
 	    this.transferPriority = transferPriority;
 	}
@@ -143,7 +142,8 @@ public class PriorityScheduler extends Scheduler {
 
 	public KThread nextThread() {
 	    Lib.assertTrue(Machine.interrupt().disabled());
-		return pickNextThread().getThread();
+	    // implement me
+	    return null;
 	}
 
 	/**
@@ -154,7 +154,8 @@ public class PriorityScheduler extends Scheduler {
 	 *		return.
 	 */
 	protected ThreadState pickNextThread() {
-	    return states.peek();
+	    // implement me
+	    return null;
 	}
 	
 	public void print() {
@@ -176,14 +177,13 @@ public class PriorityScheduler extends Scheduler {
      *
      * @see	nachos.threads.KThread#schedulingState
      */
-    protected class ThreadState implements Comparable{
+    protected class ThreadState {
 	/**
 	 * Allocate a new <tt>ThreadState</tt> object and associate it with the
 	 * specified thread.
 	 *
 	 * @param	thread	the thread this state belongs to.
 	 */
-	 
 	public ThreadState(KThread thread) {
 	    this.thread = thread;
 	    
@@ -255,28 +255,7 @@ public class PriorityScheduler extends Scheduler {
 
 	/** The thread with which this object is associated. */	   
 	protected KThread thread;
-	
-	public KThread getThread(){
-		return thread;
-		
-	}
 	/** The priority of the associated thread. */
 	protected int priority;
-	
-	public int compare(Object obj){
-		if(!(obj instanceof ThreadState)){
-			return 0;
-		}
-		ThreadState ts=(ThreadState)obj;
-		int a=getEffectivePriority();
-		int b=obj.getEffectivePriority();
-		if(a<b) return 1;
-		if(a==b) return 0;
-		return -1;
-		
-		
-	}
     }
-	
-
 }

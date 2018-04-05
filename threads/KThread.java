@@ -279,6 +279,7 @@ public class KThread {
 	
 	//ExperimentNachos Begin: Join. Note that the following code is running in currentThread.
 	boolean intStatus = Machine.interrupt().disable();
+	//System.out.println("Status: "+this.status);
 	while(this.status!=statusFinished){
 		currentThread.ready();
 		runNextThread();
@@ -431,6 +432,10 @@ public class KThread {
     private static final int statusBlocked = 3;
     private static final int statusFinished = 4;
 
+	public int getStatus(){
+		return status;
+		
+	}
     /**
      * The status of this thread. A thread can either be new (not yet forked),
      * ready (on the ready queue but not running), running, or blocked (not
