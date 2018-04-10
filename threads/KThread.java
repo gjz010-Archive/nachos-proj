@@ -54,9 +54,7 @@ public class KThread {
 	 * create an idle thread as well.
 	 */
 	public KThread() {
-		boolean status = Machine.interrupt().disable();
-		waitForJoin.acquire(this);
-		Machine.interrupt().restore(status);
+
 		if (currentThread != null) {
 			tcb = new TCB();
 		}
@@ -207,16 +205,20 @@ public class KThread {
 
 		Machine.autoGrader().finishingCurrentThread();
 
+		if(currentThread.joined){
+			currentThread.waitForJoin.nextThread().ready();
+			
+		}
 		Lib.assertTrue(toBeDestroyed == null);
 		toBeDestroyed = currentThread;
 
 		currentThread.status = statusFinished;
-
+/*
 		KThread waitThread;
 		while ((waitThread = currentThread.waitForJoin.nextThread()) != null) {
 			waitThread.ready();
 		}
-
+*/
 		sleep();
 	}
 
@@ -294,21 +296,30 @@ public class KThread {
 	 * return immediately. This method must only be called once; the second call
 	 * is not guaranteed to return. This thread must not be the current thread.
 	 */
+	 private boolean joined=false;
 	public void join() {
 		Lib.debug(dbgThread, "Joining to thread: " + toString());
 
 		Lib.assertTrue(this != currentThread);
 
-		boolean intStatus = Machine.interrupt().disable();
+		
 
 		// so the current thread will wait for this thread
 		// not need to wait if the thread is already dead
 		if (status != statusFinished) {
+			boolean intStatus = Machine.interrupt().disable();
+			if(!joined){
+				waitForJoin=ThreadedKernel.scheduler.newThreadQueue(true);
+				waitForJoin.acquire(this);
+			}
+			joined=true;
+			
 			waitForJoin.waitForAccess(currentThread);
 			KThread.sleep();
+			Machine.interrupt().restore(intStatus);
 		}
 
-		Machine.interrupt().restore(intStatus);
+		
 	}
 
 	/**
@@ -482,5 +493,5 @@ public class KThread {
 	private static KThread toBeDestroyed = null;
 	private static KThread idleThread = null;
 
-	ThreadQueue waitForJoin = ThreadedKernel.scheduler.newThreadQueue(true);
+	ThreadQueue waitForJoin = null;
 }
