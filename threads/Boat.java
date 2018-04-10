@@ -30,7 +30,7 @@ public class Boat
     public static void selfTest()
     {
 	BoatGrader b = new BoatGrader();
-	
+	/*
 	System.out.println("\n ***Testing Boats with only 2 children***");
 	begin(0, 2, b);
 	System.out.println("\n ***Testing Boats with 2 children, 1 adult***");
@@ -48,9 +48,11 @@ public class Boat
 	begin(1,1,b);
 	System.out.println("\n ***Good Driver?***");
 	begin(1,100,b);
+	*/
 	Random r=new Random();
+	
 	System.out.println("\n ***Final Test***");
-	begin(r.nextInt(100),r.nextInt(100),b);
+	b.startTest(r.nextInt(100),r.nextInt(100));
     }
 
     public static void begin( int adults, int children, BoatGrader b )

@@ -2,6 +2,7 @@ package nachos.threads;
 
 import nachos.machine.*;
 import java.util.Random;
+import nachos.ag.*;
 /**
  * A multi-threaded OS kernel.
  */
@@ -96,9 +97,10 @@ public class ThreadedKernel extends Kernel {
      * nothing.
      */
     public void run() {
+		/*
 		Random random=new Random();
 		int N=10;
-		Alarm a=new Alarm();
+		//Alarm a=new Alarm();
 		Waiter[] waiter=new Waiter[N];
 		for(int i=0;i<N;i++){
 			waiter[i]=new Waiter(a,random.nextInt(1000)*100);
@@ -106,9 +108,11 @@ public class ThreadedKernel extends Kernel {
 		for(int i=0;i<N;i++){
 			new KThread(waiter[i]).fork();
 		}
-		a.waitUntil(2000*100);
+		*/
+		//a.waitUntil(2000*100);
 		
-		Boat.selfTest();
+		//Boat.selfTest();
+		//PriorityScheduler
 		/*
 		Communicator c=new Communicator();
 		Semaphore cntr=new Semaphore(0);
@@ -127,7 +131,8 @@ public class ThreadedKernel extends Kernel {
 		}*/
 		
     }
-
+	private static PriorityGrader gg1=null;
+	private static PriorityGraderS1 gg2=null;
     /**
      * Terminate this kernel. Never returns.
      */

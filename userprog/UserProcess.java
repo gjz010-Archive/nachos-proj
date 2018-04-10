@@ -27,6 +27,9 @@ public class UserProcess {
 	pageTable = new TranslationEntry[numPhysPages];
 	for (int i=0; i<numPhysPages; i++)
 	    pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
+	fds=new OpenFile[maxFds];
+	for(int i=0;i<maxFds;i++) fds[i]=null;
+
     }
     
     /**
@@ -49,9 +52,15 @@ public class UserProcess {
      * @return	<tt>true</tt> if the program was successfully executed.
      */
     public boolean execute(String name, String[] args) {
-	if (!load(name, args))
-	    return false;
-	
+		System.out.println("Loading");
+	if (!load(name, args)){
+		System.out.println("Error!");
+		return false;
+	}
+	    
+	System.out.println("Initializing console");
+	fds[0]=UserKernel.console.openForReading();
+	fds[1]=UserKernel.console.openForWriting();
 	new UThread(this).setName(name).fork();
 
 	return true;
@@ -204,7 +213,7 @@ public class UserProcess {
 	    Lib.debug(dbgProcess, "\topen failed");
 	    return false;
 	}
-
+	System.out.println("Coff");
 	try {
 	    coff = new Coff(executable);
 	}
@@ -213,7 +222,7 @@ public class UserProcess {
 	    Lib.debug(dbgProcess, "\tcoff load failed");
 	    return false;
 	}
-
+	System.out.println("Coff1");
 	// make sure the sections are contiguous and start at page 0
 	numPages = 0;
 	for (int s=0; s<coff.getNumSections(); s++) {
@@ -225,7 +234,7 @@ public class UserProcess {
 	    }
 	    numPages += section.getLength();
 	}
-
+	System.out.println("Coff2");
 	// make sure the argv array will fit in one page
 	byte[][] argv = new byte[args.length][];
 	int argsSize = 0;
@@ -239,7 +248,7 @@ public class UserProcess {
 	    Lib.debug(dbgProcess, "\targuments too long");
 	    return false;
 	}
-
+	System.out.println("Coff3");
 	// program counter initially points at the program entry point
 	initialPC = coff.getEntryPoint();	
 
@@ -249,7 +258,7 @@ public class UserProcess {
 
 	// and finally reserve 1 page for arguments
 	numPages++;
-
+	System.out.println("Coff4");
 	if (!loadSections())
 	    return false;
 
@@ -259,7 +268,7 @@ public class UserProcess {
 
 	this.argc = args.length;
 	this.argv = entryOffset;
-	
+	System.out.println("Coff5");
 	for (int i=0; i<argv.length; i++) {
 	    byte[] stringOffsetBytes = Lib.bytesFromInt(stringOffset);
 	    Lib.assertTrue(writeVirtualMemory(entryOffset,stringOffsetBytes) == 4);
@@ -270,7 +279,7 @@ public class UserProcess {
 	    Lib.assertTrue(writeVirtualMemory(stringOffset,new byte[] { 0 }) == 1);
 	    stringOffset += 1;
 	}
-
+	System.out.println("Coff6");
 	return true;
     }
 
@@ -345,8 +354,70 @@ public class UserProcess {
 	Lib.assertNotReached("Machine.halt() did not halt machine!");
 	return 0;
     }
-
-
+	private int allocateFD(){
+		for(int i=0;i<maxFds;i++){
+			if(fds[i]==null) return i;
+		}
+		return -1;
+		
+	}
+	private int handleCreate(int p_name){
+		String name=readVirtualMemoryString(p_name,256);
+		if(name==null) return -1;
+		int fd=allocateFD();
+		if(fd==-1) return fd;
+		OpenFile f=UserKernel.fileSystem.open(name,true);
+		if(f==null) return -1;
+		fds[fd]=f;
+		return fd;
+	}
+	private int handleOpen(int p_name){
+		String name=readVirtualMemoryString(p_name,256);
+		if(name==null) return -1;
+		int fd=allocateFD();
+		if(fd==-1) return fd;
+		OpenFile f=UserKernel.fileSystem.open(name,false);
+		if(f==null) return -1;
+		fds[fd]=f;
+		return fd;
+	}
+	
+	private int handleRead(int fd,int p_buf, int count){
+		if(fds[fd]==null) return -1;
+		if(count<0) return -1;
+		byte buffer[]=new byte[count];
+		OpenFile f=fds[fd];
+		int rc=f.read(buffer,0,count);
+		if(rc==-1) return -1;
+		if(writeVirtualMemory(p_buf,buffer)!=rc) return -1;
+		return rc;
+		
+	}
+	
+	private int handleWrite(int fd, int p_buf, int count){
+		if(fds[fd]==null) return -1;
+		if(count<0) return -1;
+		byte buffer[]=new byte[count];
+		if(readVirtualMemory(p_buf,buffer)!=count) return -1;
+		OpenFile f=fds[fd];
+		int rc=f.write(buffer,0,count);
+		return rc;
+		
+	}
+	private int handleClose(int fd){
+		if(fds[fd]==null) return -1;
+		fds[fd].close();
+		fds[fd]=null;
+		return 0;
+		
+	}
+	private int handleUnlink(int p_name){
+		String name=readVirtualMemoryString(p_name,256);
+		if(name==null) return -1;
+		UserKernel.fileSystem.remove(name);
+		return 0;
+		
+	}
     private static final int
         syscallHalt = 0,
 	syscallExit = 1,
@@ -391,13 +462,24 @@ public class UserProcess {
 	switch (syscall) {
 	case syscallHalt:
 	    return handleHalt();
-
-
+	case syscallCreate:
+		return handleCreate(a0);
+	case syscallOpen:
+		return handleOpen(a0);
+	case syscallRead:
+		return handleRead(a0,a1,a2);
+	case syscallWrite:
+		return handleWrite(a0,a1,a2);
+	case syscallClose:
+		return handleClose(a0);
+	case syscallUnlink:
+		return handleUnlink(a0);
 	default:
 	    Lib.debug(dbgProcess, "Unknown syscall " + syscall);
-	    Lib.assertNotReached("Unknown system call!");
+		return -1;
+	    //Lib.assertNotReached("Unknown system call!");
 	}
-	return 0;
+	//return 0;
     }
 
     /**
@@ -446,4 +528,7 @@ public class UserProcess {
 	
     private static final int pageSize = Processor.pageSize;
     private static final char dbgProcess = 'a';
+	
+	protected final int maxFds=16;
+	protected OpenFile[] fds;
 }

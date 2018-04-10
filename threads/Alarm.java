@@ -14,7 +14,10 @@ public class Alarm {
      * <p><b>Note</b>: Nachos will not function correctly with more than one
      * alarm.
      */
+	private static boolean inited=false;
     public Alarm() {
+		if(inited) throw new Error();
+		inited=true;
 		waitingList=new PriorityQueue<>();
 		lock=new Lock();
 	Machine.timer().setInterruptHandler(new Runnable() {
@@ -29,12 +32,18 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
-	lock.acquire();
+	//lock.acquire();
+	//System.out.println("Time!");
+	boolean intStatus = Machine.interrupt().disable();
 	long curr = Machine.timer().getTime();
+	//System.out.println(waitingList.peek());
 	while(waitingList.peek()!=null && waitingList.peek().isTimeout(curr)){
+		//System.out.println("Poll!");
+		cntr--;
 		waitingList.poll().thread.ready();
 	}
-	lock.release();
+	//lock.release();
+	Machine.interrupt().restore(intStatus);
 	KThread.currentThread().yield();
     }
 
@@ -55,10 +64,18 @@ public class Alarm {
     public void waitUntil(long x) {
 	// for now, cheat just to get something working (busy waiting is bad)
 	long wakeTime = Machine.timer().getTime() + x;
-	lock.acquire();
-	waitingList.add(new WaitingThread(KThread.currentThread(),wakeTime));
-	lock.release();
 	boolean intStatus = Machine.interrupt().disable();
+	//lock.acquire();
+	//System.out.println("Push!");
+	waitingList.add(new WaitingThread(KThread.currentThread(),wakeTime));
+	//System.out.println(this);
+	cntr++;
+	//System.out.println(cntr);
+	//System.out.println(waitingList.peek());
+	//System.out.println(waitingList.peek());
+	Machine.interrupt().restore(intStatus);
+	//lock.release();
+	intStatus = Machine.interrupt().disable();
 	KThread.sleep();
 	Machine.interrupt().restore(intStatus);
 	//while (wakeTime > Machine.timer().getTime())
@@ -84,8 +101,13 @@ public class Alarm {
 			return curr>=timeout;
 			
 		}
+		public long getTimeout(){
+			return timeout;
+			
+		}
 	}
 	private PriorityQueue<WaitingThread> waitingList;
 	private Lock lock;
+	private int cntr=0;
 	
 }

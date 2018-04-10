@@ -67,7 +67,9 @@ public class StubFileSystem implements FileSystem {
     private void delay() {
 	long time = Machine.timer().getTime();
 	int amount = 1000;
+	//System.out.println("Delaying");
 	ThreadedKernel.alarm.waitUntil(amount);
+	//System.out.println("Delayed!");
 	Lib.assertTrue(Machine.timer().getTime() >= time+amount);
     }
 
