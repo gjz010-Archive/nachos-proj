@@ -74,9 +74,10 @@ public class UserProcess {
 	Lib.debug(dbgProcess,"Initializing console");
 	fds[0]=UserKernel.console.openForReading();
 	fds[1]=UserKernel.console.openForWriting();
+	UserKernel.pid.addProcess(this.pid,this);
 	mainThread=new UThread(this);
 	mainThread.setName(name).fork();
-
+	
 	return true;
     }
 	private UThread mainThread=null;
@@ -399,7 +400,7 @@ public class UserProcess {
      * Handle the halt() system call. 
      */
     private int handleHalt() {
-
+	if(pid!=0) return 0;
 	Machine.halt();
 	
 	Lib.assertNotReached("Machine.halt() did not halt machine!");
@@ -507,7 +508,7 @@ public class UserProcess {
 		Lib.debug(dbgProcess,"Exec3");
 		UserProcess proc=forkProcess();
 		if(!proc.execute(file,argv)) return -1;
-		UserKernel.pid.addProcess(proc.pid,proc);
+		
 		return proc.pid;
 	}
 
