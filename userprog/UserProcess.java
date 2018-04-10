@@ -5,7 +5,8 @@ import nachos.threads.*;
 import nachos.userprog.*;
 
 import java.io.EOFException;
-
+import java.util.LinkedList;
+import java.util.HashSet;
 /**
  * Encapsulates the state of a user process that is not contained in its
  * user thread (or threads). This includes its address translation state, a
@@ -22,6 +23,12 @@ public class UserProcess {
     /**
      * Allocate a new process.
      */
+	 private int pid=-1;
+	 private int parentPID=-1;
+	 private HashSet<Integer> childrenPIDs;
+	 private int exitCode=0;
+	 private boolean exited=false;
+	private boolean crashed=false;
     public UserProcess() {
 	int numPhysPages = Machine.processor().getNumPhysPages();
 	pageTable = new TranslationEntry[numPhysPages];
@@ -29,6 +36,12 @@ public class UserProcess {
 	    pageTable[i] = new TranslationEntry(i,i, true,false,false,false);
 	fds=new OpenFile[maxFds];
 	for(int i=0;i<maxFds;i++) fds[i]=null;
+	memMap=new VirtualMemoryHelper();
+	pid=UserKernel.pid.allocate();
+	
+	crashed=false;
+	exited=false;
+	childrenPIDs=new HashSet<>();
 
     }
     
@@ -52,20 +65,25 @@ public class UserProcess {
      * @return	<tt>true</tt> if the program was successfully executed.
      */
     public boolean execute(String name, String[] args) {
-		System.out.println("Loading");
+		Lib.debug(dbgProcess,"Loading");
 	if (!load(name, args)){
-		System.out.println("Error!");
+		Lib.debug(dbgProcess,"Error!");
 		return false;
 	}
 	    
-	System.out.println("Initializing console");
+	Lib.debug(dbgProcess,"Initializing console");
 	fds[0]=UserKernel.console.openForReading();
 	fds[1]=UserKernel.console.openForWriting();
-	new UThread(this).setName(name).fork();
+	mainThread=new UThread(this);
+	mainThread.setName(name).fork();
 
 	return true;
     }
-
+	private UThread mainThread=null;
+	private void joinMainThread(){
+		System.out.println(mainThread);
+		mainThread.join();
+	}
     /**
      * Save the state of this process in preparation for a context switch.
      * Called by <tt>UThread.saveState()</tt>.
@@ -145,10 +163,16 @@ public class UserProcess {
 	// for now, just assume that virtual addresses equal physical addresses
 	if (vaddr < 0 || vaddr >= memory.length)
 	    return 0;
-
+	
+	ArrayMapping mapping[]=memMap.getMapping(vaddr,offset,length,false);
+	int amount=0;
+	for(int i=0;i<mapping.length;i++){
+		amount+=mapping[i].performRead(data);
+	}
+	/*
 	int amount = Math.min(length, memory.length-vaddr);
 	System.arraycopy(memory, vaddr, data, offset, amount);
-
+	*/
 	return amount;
     }
 
@@ -186,12 +210,19 @@ public class UserProcess {
 	byte[] memory = Machine.processor().getMemory();
 	
 	// for now, just assume that virtual addresses equal physical addresses
+	
+	ArrayMapping mapping[]=memMap.getMapping(vaddr,offset,length,true);
+	int amount=0;
+	for(int i=0;i<mapping.length;i++){
+		amount+=mapping[i].performWrite(data);
+	}
+	/*
 	if (vaddr < 0 || vaddr >= memory.length)
 	    return 0;
 
 	int amount = Math.min(length, memory.length-vaddr);
 	System.arraycopy(data, offset, memory, vaddr, amount);
-
+	*/
 	return amount;
     }
 
@@ -213,7 +244,7 @@ public class UserProcess {
 	    Lib.debug(dbgProcess, "\topen failed");
 	    return false;
 	}
-	System.out.println("Coff");
+	Lib.debug(dbgProcess,"Coff");
 	try {
 	    coff = new Coff(executable);
 	}
@@ -222,7 +253,7 @@ public class UserProcess {
 	    Lib.debug(dbgProcess, "\tcoff load failed");
 	    return false;
 	}
-	System.out.println("Coff1");
+	Lib.debug(dbgProcess,"Coff1");
 	// make sure the sections are contiguous and start at page 0
 	numPages = 0;
 	for (int s=0; s<coff.getNumSections(); s++) {
@@ -234,7 +265,7 @@ public class UserProcess {
 	    }
 	    numPages += section.getLength();
 	}
-	System.out.println("Coff2");
+	Lib.debug(dbgProcess,"Coff2");
 	// make sure the argv array will fit in one page
 	byte[][] argv = new byte[args.length][];
 	int argsSize = 0;
@@ -248,7 +279,7 @@ public class UserProcess {
 	    Lib.debug(dbgProcess, "\targuments too long");
 	    return false;
 	}
-	System.out.println("Coff3");
+	Lib.debug(dbgProcess,"Coff3");
 	// program counter initially points at the program entry point
 	initialPC = coff.getEntryPoint();	
 
@@ -258,7 +289,7 @@ public class UserProcess {
 
 	// and finally reserve 1 page for arguments
 	numPages++;
-	System.out.println("Coff4");
+	Lib.debug(dbgProcess,"Coff4");
 	if (!loadSections())
 	    return false;
 
@@ -268,7 +299,7 @@ public class UserProcess {
 
 	this.argc = args.length;
 	this.argv = entryOffset;
-	System.out.println("Coff5");
+	Lib.debug(dbgProcess,"Coff5");
 	for (int i=0; i<argv.length; i++) {
 	    byte[] stringOffsetBytes = Lib.bytesFromInt(stringOffset);
 	    Lib.assertTrue(writeVirtualMemory(entryOffset,stringOffsetBytes) == 4);
@@ -279,7 +310,7 @@ public class UserProcess {
 	    Lib.assertTrue(writeVirtualMemory(stringOffset,new byte[] { 0 }) == 1);
 	    stringOffset += 1;
 	}
-	System.out.println("Coff6");
+	Lib.debug(dbgProcess,"Coff6");
 	return true;
     }
 
@@ -291,11 +322,21 @@ public class UserProcess {
      * @return	<tt>true</tt> if the sections were successfully loaded.
      */
     protected boolean loadSections() {
+	//ExperimentNachos
+	int pages[]=UserKernel.memoryPages.malloc(numPages);
+	if(pages==null){
+		coff.close();
+		Lib.debug(dbgProcess, "\tExperimentNachos: insufficient virtual memory");
+		return false;
+	}
+	pageTable=new TranslationEntry[numPages];
+	/*
 	if (numPages > Machine.processor().getNumPhysPages()) {
 	    coff.close();
 	    Lib.debug(dbgProcess, "\tinsufficient physical memory");
 	    return false;
 	}
+	*/
 
 	// load sections
 	for (int s=0; s<coff.getNumSections(); s++) {
@@ -306,12 +347,16 @@ public class UserProcess {
 
 	    for (int i=0; i<section.getLength(); i++) {
 		int vpn = section.getFirstVPN()+i;
-
+		pageTable[vpn]=new TranslationEntry(vpn,pages[vpn],true,section.isReadOnly(),false,false);
 		// for now, just assume virtual addresses=physical addresses
-		section.loadPage(i, vpn);
+		section.loadPage(i, pages[vpn]);
 	    }
 	}
-	
+	for(int i=0;i<=stackPages;i++){
+		int index=numPages-i-1;
+		pageTable[index]=new TranslationEntry(index,pages[index],true,false,false,false);
+		
+	}
 	return true;
     }
 
@@ -319,6 +364,12 @@ public class UserProcess {
      * Release any resources allocated by <tt>loadSections()</tt>.
      */
     protected void unloadSections() {
+		
+		for(int i=0;i<pageTable.length;i++){
+			Lib.debug(dbgProcess,"Free!");
+			UserKernel.memoryPages.free(pageTable[i].ppn);
+			
+		}
     }    
 
     /**
@@ -383,18 +434,36 @@ public class UserProcess {
 	}
 	
 	private int handleRead(int fd,int p_buf, int count){
-		if(fds[fd]==null) return -1;
-		if(count<0) return -1;
+		if(fd<0 || fd>=maxFds){
+			Lib.debug(dbgProcess,"Bad File Descriptor!");
+			return -1;
+		}
+		if(fds[fd]==null){
+			Lib.debug(dbgProcess,"Bad or Closed File Descriptor!");
+			return -1;
+		}
+		if(count<0){
+			Lib.debug(dbgProcess,"Bad Count!");
+			return -1;
+		}
 		byte buffer[]=new byte[count];
 		OpenFile f=fds[fd];
 		int rc=f.read(buffer,0,count);
-		if(rc==-1) return -1;
-		if(writeVirtualMemory(p_buf,buffer)!=rc) return -1;
+		if(rc==-1){
+			Lib.debug(dbgProcess,"Read Error!");
+			return -1;
+		}
+		int cc=writeVirtualMemory(p_buf,buffer,0,rc);
+		if(cc!=rc){
+			Lib.debug(dbgProcess,"Write to memory error! "+cc+" "+rc);
+			return -1;
+		}
 		return rc;
 		
 	}
 	
 	private int handleWrite(int fd, int p_buf, int count){
+		if(fd<0 || fd>=maxFds) return -1;
 		if(fds[fd]==null) return -1;
 		if(count<0) return -1;
 		byte buffer[]=new byte[count];
@@ -405,6 +474,7 @@ public class UserProcess {
 		
 	}
 	private int handleClose(int fd){
+		if(fd<0 || fd>=maxFds) return -1;
 		if(fds[fd]==null) return -1;
 		fds[fd].close();
 		fds[fd]=null;
@@ -417,6 +487,72 @@ public class UserProcess {
 		UserKernel.fileSystem.remove(name);
 		return 0;
 		
+	}
+	
+	private int handleExec(int p_file, int argc, int p_argv){
+		Lib.debug(dbgProcess,"Exec1");
+		String file=readVirtualMemoryString(p_file,256);
+		if(file==null) return -1;
+		if(argc<0) return -1;
+		String argv[]=new String[argc];
+		Lib.debug(dbgProcess,"Exec2");
+		for(int i=0;i<argc;i++){
+			byte pointer[]=new byte[4];
+			if(readVirtualMemory(p_argv+i*4,pointer)!=4) return -1;
+			int arg_addr=(int) ((((int) pointer[0] & 0xFF) << 0)|(((int) pointer[1] & 0xFF) << 8)|(((int) pointer[2] & 0xFF) << 16) |(((int) pointer[3] & 0xFF) << 24));
+			argv[i]=readVirtualMemoryString(arg_addr, 256);
+			if(argv[i]==null) return -1;
+			
+		}
+		Lib.debug(dbgProcess,"Exec3");
+		UserProcess proc=forkProcess();
+		if(!proc.execute(file,argv)) return -1;
+		UserKernel.pid.addProcess(proc.pid,proc);
+		return proc.pid;
+	}
+
+	private int handleJoin(int pid, int p_status){
+		if(!childrenPIDs.contains(pid)){
+			Lib.debug(dbgProcess,"Joining non-child process!");
+			return -1;
+		}
+		childrenPIDs.remove(pid);
+		UserProcess child=UserKernel.pid.getProcess(pid);
+		if(child==null){
+			Lib.debug(dbgProcess,"Process not exist!");
+			return -1;
+		}
+		if(!child.exited) child.joinMainThread();
+		Lib.assertTrue(child.exited);
+		int status=child.exitCode;
+		int ret=child.crashed?0:1;
+		Lib.debug(dbgProcess,"Return value: "+ret);
+		byte arr[]=new byte[4];
+		arr[0] = (byte) ((status>>0) &0xFF);
+		arr[1] = (byte) ((status>>8) &0xFF);
+		arr[2] = (byte) ((status>>16)&0xFF);
+		arr[3] = (byte) ((status>>24)&0xFF);
+		if(writeVirtualMemory(p_status, arr)!=4) return -1;
+		return ret;
+	}
+	
+	private UserProcess forkProcess(){
+		UserProcess child=UserProcess.newUserProcess();
+		child.parentPID=pid;
+		childrenPIDs.add(child.pid);
+		return child;
+	}
+	private void handleExit(int status){
+		unloadSections();
+		for(int i=0;i<maxFds;i++){
+			if(fds[i]!=null) fds[i].close();
+			
+		}
+		UserKernel.pid.removeProcess(pid);
+		
+		exited=true;
+		exitCode=status;
+		UThread.finish();
 	}
     private static final int
         syscallHalt = 0,
@@ -462,6 +598,11 @@ public class UserProcess {
 	switch (syscall) {
 	case syscallHalt:
 	    return handleHalt();
+	case syscallExit:
+		handleExit(a0);
+		return 0;
+	case syscallExec:
+		return handleExec(a0,a1,a2);
 	case syscallCreate:
 		return handleCreate(a0);
 	case syscallOpen:
@@ -474,6 +615,8 @@ public class UserProcess {
 		return handleClose(a0);
 	case syscallUnlink:
 		return handleUnlink(a0);
+	case syscallJoin:
+		return handleJoin(a0,a1);
 	default:
 	    Lib.debug(dbgProcess, "Unknown syscall " + syscall);
 		return -1;
@@ -508,7 +651,10 @@ public class UserProcess {
 	default:
 	    Lib.debug(dbgProcess, "Unexpected exception: " +
 		      Processor.exceptionNames[cause]);
-	    Lib.assertNotReached("Unexpected exception");
+		Lib.debug(dbgProcess,"Crash!");
+		crashed=true;
+		handleExit(-1);
+	    //Lib.assertNotReached("Unexpected exception");
 	}
     }
 
@@ -531,4 +677,101 @@ public class UserProcess {
 	
 	protected final int maxFds=16;
 	protected OpenFile[] fds;
+	private VirtualMemoryHelper memMap;
+	
+	//Virtual memory helper to map array onto physical memory segments and perform write operations.
+	private class VirtualMemoryHelper{
+		private VirtualMemoryHelper(){
+			
+			
+		}
+		public ArrayMapping[] getMapping(int start, int offset, int count, boolean write){
+			
+			int firstPage=Processor.pageFromAddress(start);
+			int firstOffset=Processor.offsetFromAddress(start);
+			int lastPage=Processor.pageFromAddress(start+count);
+			if(firstPage==lastPage){ //In-page operation
+				ArrayMapping map=generateMap(firstPage, firstOffset, offset, count, write);
+				if(map==null) return new ArrayMapping[0];
+				ArrayMapping arr[]=new ArrayMapping[1];
+				arr[0]=map;
+				return arr;
+				
+			}else{
+				LinkedList<ArrayMapping> mapping=new LinkedList<>();
+				int firstPageCount=pageSize-firstOffset;
+				count-=firstPageCount;
+				ArrayMapping map=generateMap(firstPage, firstOffset, offset, firstPageCount, write);
+				offset+=firstPageCount;
+				if(map==null) return cast(mapping);
+				mapping.add(map);
+				for(int i=firstPage+1;i<lastPage;i++){
+					count-=pageSize;
+					map=generateMap(i,0,offset,pageSize,write);
+					if(map==null) return cast(mapping);
+					offset+=firstPageCount;
+					mapping.add(map);
+				}
+				map=generateMap(lastPage,0,offset,count,write);
+				if(map==null) return cast(mapping);
+				mapping.add(map);
+				return cast(mapping);
+				
+			}
+
+		}
+		private ArrayMapping generateMap(int page, int poffset, int offset, int count, boolean write){
+			TranslationEntry entry=preparePage(page, write);
+			if(entry==null) return null;
+			int physPage=entry.ppn;
+			int physAddr=Processor.makeAddress(physPage, poffset);
+			return new ArrayMapping(physAddr, offset, count);
+		}
+		private TranslationEntry preparePage(int page, boolean write){
+			if(page<0 || page>=UserProcess.this.numPages){
+				return null;
+			}
+			TranslationEntry entry=UserProcess.this.pageTable[page];
+			if(entry==null) return null;
+			if(write){
+				if(entry.readOnly) return null;
+				else entry.dirty=true;
+			}
+			entry.used=true;
+			return entry;
+		}
+		private ArrayMapping[] cast(LinkedList<ArrayMapping> list){
+			ArrayMapping[] r=new ArrayMapping[list.size()];
+			list.toArray(r);
+			return r;
+			
+		}
+
+	}
+	private class ArrayMapping{
+		private int physAddr;
+		private int arrayOffset;
+		private int mapCount;
+		
+		public ArrayMapping(int addr, int offset, int count){
+			physAddr=addr;
+			arrayOffset=offset;
+			mapCount=count;
+		}
+		
+		public int performWrite(byte[] src){
+			byte[] memory = Machine.processor().getMemory();
+			System.arraycopy(src, arrayOffset, memory, physAddr, mapCount);
+			return mapCount;
+			
+		}
+		public int performRead(byte[] target){
+			byte[] memory = Machine.processor().getMemory();
+			System.arraycopy(memory, physAddr, target, arrayOffset, mapCount);
+			return mapCount;
+		}
+		
+	}
 }
+
+

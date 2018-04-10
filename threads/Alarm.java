@@ -63,19 +63,12 @@ public class Alarm {
      */
     public void waitUntil(long x) {
 	// for now, cheat just to get something working (busy waiting is bad)
-	long wakeTime = Machine.timer().getTime() + x;
 	boolean intStatus = Machine.interrupt().disable();
+	long wakeTime = Machine.timer().getTime() + x;
+	
 	//lock.acquire();
 	//System.out.println("Push!");
 	waitingList.add(new WaitingThread(KThread.currentThread(),wakeTime));
-	//System.out.println(this);
-	cntr++;
-	//System.out.println(cntr);
-	//System.out.println(waitingList.peek());
-	//System.out.println(waitingList.peek());
-	Machine.interrupt().restore(intStatus);
-	//lock.release();
-	intStatus = Machine.interrupt().disable();
 	KThread.sleep();
 	Machine.interrupt().restore(intStatus);
 	//while (wakeTime > Machine.timer().getTime())

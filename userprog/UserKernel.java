@@ -3,7 +3,9 @@ package nachos.userprog;
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
-
+import java.util.LinkedList;
+import java.util.HashSet;
+import java.util.HashMap;
 /**
  * A kernel that can support multiple user processes.
  */
@@ -23,7 +25,8 @@ public class UserKernel extends ThreadedKernel {
 	super.initialize(args);
 
 	console = new SynchConsole(Machine.console());
-	
+	memoryPages=new MemoryPageManager(Machine.processor().getNumPhysPages());
+	pid=new PIDManager();
 	Machine.processor().setExceptionHandler(new Runnable() {
 		public void run() { exceptionHandler(); }
 	    });
@@ -113,4 +116,99 @@ public class UserKernel extends ThreadedKernel {
 
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
+	
+	public static class MemoryPageManager{
+		private int totalPages;
+		private int freePages;
+		private int lastPage=0;
+		private Lock lock;
+		private LinkedList<Integer> recycledPages;
+		public MemoryPageManager(int physMemoryPages){
+			totalPages=freePages=physMemoryPages;
+			recycledPages=new LinkedList<Integer>();
+			lock=new Lock();
+		}
+		public int[] malloc(int size){
+			System.out.println(size);
+			lock.acquire();
+			if(size>freePages){
+				lock.release();
+				return null;
+			}
+			freePages-=size;
+			int pages[]=new int[size];
+			for(int i=0;i<size;i++) pages[i]=fetchPage();
+			lock.release();
+			return pages;
+		}
+		private int fetchPage(){
+			if(recycledPages.peek()!=null) return recycledPages.poll();
+			else return lastPage++;
+			
+		}
+		public void free(int page){
+			lock.acquire();
+			recycledPages.add(page);
+			freePages++;
+			if(freePages==totalPages){
+				recycledPages.clear();
+				
+			}
+			lock.release();
+		}
+		
+	}
+	public static MemoryPageManager memoryPages=null;
+	
+	public static class PIDManager{
+		int lastPID=0;
+		Lock lock;
+		private HashMap<Integer, UserProcess> current;
+		private HashMap<Integer, UserProcess> zombies;
+		public PIDManager(){
+			lock=new Lock();
+			lastPID=0;
+			current=new HashMap<>();
+			zombies=new HashMap<>();
+		}
+		public int allocate(){
+			lock.acquire();
+			int p=lastPID++;
+			lock.release();
+			return p;
+		}
+		public void addProcess(int pid, UserProcess process){
+			lock.acquire();
+			//System.out.println("Adding "+pid);
+			current.put(pid,process);
+			lock.release();
+		}
+		public void removeProcess(int pid){
+			lock.acquire();
+			UserProcess zombie=current.get(pid);
+			current.remove(pid);
+			zombies.put(pid, zombie);
+			if(current.size()==0) Kernel.kernel.terminate();
+			lock.release();
+		}
+		
+		public UserProcess getProcess(int pid){
+			lock.acquire();
+			UserProcess process=current.get(pid);
+			if(process!=null){
+				//System.out.println(process);
+				lock.release();
+				return process;
+			}
+			//System.out.println("Getting Zombie Process!");
+			process=zombies.get(pid);
+			zombies.remove(pid);
+			lock.release();
+			return process;
+			
+		}
+		
+	}
+	public static PIDManager pid=null;
 }
+
