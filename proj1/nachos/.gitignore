@@ -1,0 +1,4 @@
+*/*/*.class
+nachos_env.bat
+nachos_env.sh
+doc
