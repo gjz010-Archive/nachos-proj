@@ -32,5 +32,6 @@ main()
 		 C[i][j] += A[i][k] * B[k][j];
 
     printf("C[%d][%d] = %d\n", Dim-1, Dim-1, C[Dim-1][Dim-1]);
+    return 0;
     return (C[Dim-1][Dim-1]);		/* and then we're done */
 }

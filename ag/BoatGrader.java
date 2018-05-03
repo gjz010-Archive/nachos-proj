@@ -21,7 +21,7 @@ public class BoatGrader extends BasicTestGrader {
 	 * from one island to another. Inclusion in this class does not imply that
 	 * any of the indicated actions are a good idea or even allowed.
 	 */
-	 void run() {
+	void run() {
 
 		final int adults = getIntegerArgument("adults");
 		final int children = getIntegerArgument("children");
@@ -32,7 +32,7 @@ public class BoatGrader extends BasicTestGrader {
 		done();
 	}
 
-	public  void startTest(int adults, int children) {
+	public void startTest(int adults, int children) {
 		this.adultsOahu = adults;
 		this.childrenOahu = children;
 		this.adultsMolokai = this.childrenMolokai = 0;
@@ -45,14 +45,14 @@ public class BoatGrader extends BasicTestGrader {
 
 	/**
 	 */
-	protected  void check(boolean value, String msg) {
+	protected void check(boolean value, String msg) {
 		Lib.assertTrue(value, msg);
 	}
 
 	/**
 	 * all the passenger has been crossed
 	 */
-	public  void AllCrossed() {
+	public void AllCrossed() {
 		check(adultsOahu == 0, "there are still " + adultsOahu
 				+ " adults in Oahu");
 		check(childrenOahu == 0, "there are still " + childrenOahu
@@ -60,7 +60,7 @@ public class BoatGrader extends BasicTestGrader {
 		System.out.println("All crossed.");
 	}
 
-	private  void doYield() {
+	private void doYield() {
 		while (random.nextBoolean())
 			KThread.yield();
 	}
@@ -69,7 +69,7 @@ public class BoatGrader extends BasicTestGrader {
 	 * ChildRowToMolokai should be called when a child pilots the boat from Oahu
 	 * to Molokai
 	 */
-	public  void ChildRowToMolokai() {
+	public void ChildRowToMolokai() {
 		doYield();
 		check(childrenOahu > 0,
 				"no children in Oahu,invalid operation ChildRowToMolokai");
@@ -82,7 +82,7 @@ public class BoatGrader extends BasicTestGrader {
 	 * ChildRowToOahu should be called when a child pilots the boat from Molokai
 	 * to Oahu
 	 */
-	public  void ChildRowToOahu() {
+	public void ChildRowToOahu() {
 		doYield();
 		check(childrenMolokai > 0,
 				"no children in Oahu , invalid operation ChildRowToOahu");
@@ -95,7 +95,7 @@ public class BoatGrader extends BasicTestGrader {
 	 * ChildRideToMolokai should be called when a child not piloting the boat
 	 * disembarks on Molokai
 	 */
-	public  void ChildRideToMolokai() {
+	public void ChildRideToMolokai() {
 		doYield();
 		check(childrenOahu > 0,
 				"no children in Molokai , invalid operation ChildRideToMolokai");
@@ -108,7 +108,7 @@ public class BoatGrader extends BasicTestGrader {
 	 * ChildRideToOahu should be called when a child not piloting the boat
 	 * disembarks on Oahu
 	 */
-	public  void ChildRideToOahu() {
+	public void ChildRideToOahu() {
 		doYield();
 		check(childrenMolokai > 0,
 				"no children in Molokai, invalid operation ChildRideToOahu");
@@ -121,7 +121,7 @@ public class BoatGrader extends BasicTestGrader {
 	 * AdultRowToMolokai should be called when a adult pilots the boat from Oahu
 	 * to Molokai
 	 */
-	public  void AdultRowToMolokai() {
+	public void AdultRowToMolokai() {
 		doYield();
 		check(adultsOahu > 0,
 				" no adult in Oahu , invalid operation AdultRowToMolokai");
@@ -134,7 +134,7 @@ public class BoatGrader extends BasicTestGrader {
 	 * AdultRowToOahu should be called when a adult pilots the boat from Molokai
 	 * to Oahu
 	 */
-	public  void AdultRowToOahu() {
+	public void AdultRowToOahu() {
 		doYield();
 		check(adultsMolokai > 0,
 				"no adult in Molokai , invalid operation AdultRowToOahu");
@@ -147,13 +147,13 @@ public class BoatGrader extends BasicTestGrader {
 	 * AdultRideToMolokai should be called when an adult not piloting the boat
 	 * disembarks on Molokai
 	 */
-	public  void AdultRideToMolokai() {
+	public void AdultRideToMolokai() {
 		Lib.assertNotReached("invalid operation AdultRideToMolokai");
 		// System.out.println("**Adult arrived on Molokai as a passenger.");
 	}
 
 	@Override
-	public  void readyThread(KThread thread) {
+	public void readyThread(KThread thread) {
 		if (thread==idleThread) {
 			++idleReadyCount;
 			if (idleReadyCount > 1000)
@@ -167,21 +167,21 @@ public class BoatGrader extends BasicTestGrader {
 	 * AdultRideToOahu should be called when an adult not piloting the boat
 	 * disembarks on Oahu
 	 */
-	public  void AdultRideToOahu() {
+	public void AdultRideToOahu() {
 		Lib.assertNotReached("invalid operation AdultRideToOahu");
 		// System.out.println("**Adult arrived on Oahu as a passenger.");
 	}
 
 	@Override
-	public  void setIdleThread(KThread thread){
+	public void setIdleThread(KThread thread){
 		thread=idleThread;
 	}
 
-	public  void initializeAdult() {
+	public void initializeAdult() {
 		System.out.println("An adult is initialized.");
 	}
 
-	public  void initializeChild() {
+	public void initializeChild() {
 		System.out.println("A child is initialized.");
 	}
 	KThread idleThread;

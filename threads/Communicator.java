@@ -45,14 +45,10 @@ public class Communicator {
 			waitingSpeakers--;
 		}
 		isWriting=true;
-		lock.release();
 		System.out.println("Writing "+word+" to buffer.");
 		buffer=word;
-		lock.acquire();
 		if(waitingListeners>0){
-			activeListeners=waitingListeners;
-			listenReady.wakeAll();
-			
+			listenReady.wake();
 		}
 		lock.release();
     }
@@ -68,23 +64,24 @@ public class Communicator {
 		lock.acquire();
 		while(!isWriting){
 			waitingListeners++;
+			if(waitingSpeakers>0) speakReady.wake();
 			listenReady.sleep();
 			waitingListeners--;
 		}
-		
-		lock.release();
+		//activeListeners++;
 		result=buffer;
 		System.out.println("Reading "+result+" from buffer.");
-		lock.acquire();
-		activeListeners--;
-		if(activeListeners==0){ //The "last" leaving listener clean up the mess.
+		//activeListeners--;
+		//if(activeListeners==0){ //The "last" leaving listener clean up the mess.
 			isWriting=false;
+			System.out.println("Cleanup");
 			if(waitingSpeakers>0){
 				speakReady.wake();
 				
 			}
-		}
+		//}
 		lock.release();
+		System.out.println("Read Done.");
 		return result;
     }
 }

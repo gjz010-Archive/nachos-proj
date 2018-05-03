@@ -36,6 +36,7 @@ public class StubFileSystem implements FileSystem {
 	    return new StubOpenFile(name, truncate);
 	}
 	catch (IOException e) {
+		e.printStackTrace();
 	    return null;
 	}
     }

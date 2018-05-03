@@ -53,6 +53,7 @@ public class UserProcess {
      * @return	a new process of the correct class.
      */
     public static UserProcess newUserProcess() {
+	//System.out.println(Machine.getProcessClassName());
 	return (UserProcess)Lib.constructObject(Machine.getProcessClassName());
     }
 
@@ -82,7 +83,7 @@ public class UserProcess {
     }
 	private UThread mainThread=null;
 	private void joinMainThread(){
-		System.out.println(mainThread);
+		//System.out.println(mainThread);
 		mainThread.join();
 	}
     /**
@@ -237,10 +238,11 @@ public class UserProcess {
      * @param	args	the arguments to pass to the executable.
      * @return	<tt>true</tt> if the executable was successfully loaded.
      */
+	 OpenFile executable=null;
     private boolean load(String name, String[] args) {
 	Lib.debug(dbgProcess, "UserProcess.load(\"" + name + "\")");
 	
-	OpenFile executable = ThreadedKernel.fileSystem.open(name, false);
+	executable = ThreadedKernel.fileSystem.open(name, false);
 	if (executable == null) {
 	    Lib.debug(dbgProcess, "\topen failed");
 	    return false;
@@ -544,6 +546,12 @@ public class UserProcess {
 		return child;
 	}
 	private void handleExit(int status){
+		exited=true;
+		exitCode=status;
+		cleanUp();
+	}
+	
+	private void cleanUp(){
 		unloadSections();
 		for(int i=0;i<maxFds;i++){
 			if(fds[i]!=null) fds[i].close();
@@ -551,8 +559,8 @@ public class UserProcess {
 		}
 		UserKernel.pid.removeProcess(pid);
 		
-		exited=true;
-		exitCode=status;
+
+		if(executable!=null) executable.close();
 		UThread.finish();
 	}
     private static final int
@@ -654,7 +662,9 @@ public class UserProcess {
 		      Processor.exceptionNames[cause]);
 		Lib.debug(dbgProcess,"Crash!");
 		crashed=true;
-		handleExit(-1);
+		exited=true;
+		exitCode=-1;
+		cleanUp();
 	    //Lib.assertNotReached("Unexpected exception");
 	}
     }

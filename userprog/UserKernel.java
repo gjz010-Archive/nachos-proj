@@ -94,13 +94,13 @@ public class UserKernel extends ThreadedKernel {
      */
     public void run() {
 	super.run();
-	System.out.println("UserKernel");
+	//System.out.println("UserKernel");
 	UserProcess process = UserProcess.newUserProcess();
 	
 	String shellProgram = Machine.getShellProgramName();	
-	System.out.println(shellProgram);
+	//System.out.println(shellProgram);
 	Lib.assertTrue(process.execute(shellProgram, new String[] { }));
-	System.out.println(shellProgram);
+	//System.out.println(shellProgram);
 	KThread.currentThread().finish();
     }
 
@@ -129,7 +129,7 @@ public class UserKernel extends ThreadedKernel {
 			lock=new Lock();
 		}
 		public int[] malloc(int size){
-			System.out.println(size);
+			//System.out.println(size);
 			lock.acquire();
 			if(size>freePages){
 				lock.release();
@@ -154,6 +154,7 @@ public class UserKernel extends ThreadedKernel {
 				recycledPages.clear();
 				
 			}
+			//System.out.println(freePages+" free pages left!");
 			lock.release();
 		}
 		
