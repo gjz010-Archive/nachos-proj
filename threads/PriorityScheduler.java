@@ -233,8 +233,10 @@ public class PriorityScheduler extends Scheduler {
 		 * @return the effective priority of the associated thread.
 		 */
 		public int getEffectivePriority() {
-			if (effectivePriority != effectivePriorityDefault) return effectivePriority;
-			else return getEffectivePriority(new HashSet<ThreadState>());
+			if (effectivePriority != effectivePriorityDefault) 
+				return effectivePriority;
+			else 
+				return getEffectivePriority(new HashSet<ThreadState>());
 		}
 		
 		private int getEffectivePriority(HashSet<ThreadState> set) {
@@ -257,7 +259,7 @@ public class PriorityScheduler extends Scheduler {
 					}
 			
 			PriorityQueue queue = (PriorityQueue) thread.waitForJoin;
-			if (queue.transferPriority)
+			if (queue != null && queue.transferPriority)
 				for (KThread thread : queue.waitQueue) {
 					set.add(this);
 					int ep = getThreadState(thread).getEffectivePriority(set);
@@ -298,7 +300,7 @@ public class PriorityScheduler extends Scheduler {
 		public void waitForAccess(PriorityQueue waitQueue) {
 			waitQueue.waitQueue.add(thread);
 			if (waitQueue.lockHolder == null) return;
-			else waitQueue.lockHolder.updateEffectivePriority();
+			else waitQueue.lockHolder.effectivePriority = effectivePriorityDefault;
 		}
 
 		/**
