@@ -314,6 +314,8 @@ public class UserProcess {
 	    stringOffset += 1;
 	}
 	Lib.debug(dbgProcess,"Coff6");
+	//coff.close();
+	//executable.close();
 	return true;
     }
 

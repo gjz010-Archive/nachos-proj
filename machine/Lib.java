@@ -504,7 +504,7 @@ public final class Lib {
             // Fixed for Java 1.5 by geels
             Class[] param_types = new Class[0];
             Object[] params = new Object[0];
-	    System.out.println("ClassName: "+className);
+	    //System.out.println("ClassName: "+className);
 	    return loadClass(className).getConstructor(param_types).newInstance(params);
 	}
 	catch (Throwable e) {
